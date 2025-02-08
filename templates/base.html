@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Trivia AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Top Advertisement Space -->
+    <div class="ad-space ad-top">
+        <div class="ad-placeholder">Advertisement</div>
+    </div>
+
+    <nav class="navbar">
+        <div class="nav-brand">Daily Trivia AI</div>
+        <div class="nav-links">
+            {% if current_user.is_authenticated %}
+                <span>Welcome, {{ current_user.username }}</span>
+                <button onclick="logout()">Logout</button>
+            {% else %}
+                <a href="{{ url_for('login') }}">Login</a>
+                <a href="{{ url_for('signup') }}">Sign Up</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bottom Advertisement Space -->
+    <div class="ad-space ad-bottom">
+        <div class="ad-placeholder">Advertisement</div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
