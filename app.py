@@ -24,7 +24,7 @@ login_manager.login_view = 'login'
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password = db.Column(db.String(120), nullable=False)
+    password = db.Column(db.LargeBinary, nullable=False)
     scores = db.relationship('Score', backref='user', lazy=True)
 
 class Score(db.Model):
@@ -93,7 +93,26 @@ def get_questions():
     daily_questions = DailyQuestions.query.filter_by(date=today).first()
     
     if daily_questions:
-        return jsonify(json.loads(daily_questions.questions))
+        try:
+            questions_data = json.loads(daily_questions.questions)
+            if not questions_data:
+                return jsonify({'error': 'Invalid question data'}), 500
+            return jsonify(questions_data)
+        except json.JSONDecodeError:
+            return jsonify({'error': 'Invalid question format'}), 500
+    
+    # If no questions available, try to generate them
+    try:
+        from question_generator import generate_daily_questions
+        generate_daily_questions()
+        
+        # Try fetching again
+        daily_questions = DailyQuestions.query.filter_by(date=today).first()
+        if daily_questions:
+            return jsonify(json.loads(daily_questions.questions))
+    except Exception as e:
+        print(f"Error generating questions: {e}")
+    
     return jsonify({'error': 'No questions available'}), 404
 
 @app.route('/submit_score', methods=['POST'])
@@ -124,4 +143,4 @@ def get_user_scores():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)
