@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from datetime import datetime, date
+from datetime import date
 import os
 from dotenv import load_dotenv
 import json
@@ -9,8 +9,14 @@ import bcrypt
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, 
+           template_folder='../frontend/templates',
+           static_folder='../frontend/static')
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
+app.config['PERMANENT_SESSION_LIFETIME'] = 60 * 60 * 24 * 30  # 30 days
+app.config['SESSION_COOKIE_SECURE'] = False  # Allow non-HTTPS in development
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
     'DATABASE_URL',
     'postgresql://trivia_user:trivia_password@db:5432/trivia_db'
@@ -40,7 +46,7 @@ class DailyQuestions(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 # Routes
 @app.route('/')
@@ -74,7 +80,8 @@ def login():
         user = User.query.filter_by(username=data.get('username')).first()
         
         if user and bcrypt.checkpw(data.get('password').encode('utf-8'), user.password):
-            login_user(user)
+            login_user(user, remember=True)
+            session.permanent = True
             return jsonify({'message': 'Logged in successfully'})
         
         return jsonify({'error': 'Invalid username or password'}), 401
@@ -88,7 +95,10 @@ def logout():
     return jsonify({'message': 'Logged out successfully'})
 
 @app.route('/get_questions')
+@login_required
 def get_questions():
+    print("User authenticated:", current_user.is_authenticated)
+    print("Current user:", current_user.get_id() if current_user.is_authenticated else None)
     today = date.today()
     daily_questions = DailyQuestions.query.filter_by(date=today).first()
     

@@ -4,18 +4,20 @@ services:
   web:
     build: .
     ports:
-      - "5001:5000"
+      - "5002:5000"
     volumes:
       - .:/app
     environment:
-      - FLASK_APP=app.py
+      - FLASK_APP=backend/app.py
       - FLASK_ENV=development
     env_file:
       - .env
     depends_on:
-      - db
-    command: >
-      sh -c "python app.py"
+      db:
+        condition: service_healthy
+    networks:
+      - trivia_network
+    command: python backend/app.py
 
   question_generator:
     build: .
@@ -24,8 +26,15 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
-    command: python question_generator.py
+      db:
+        condition: service_healthy
+    networks:
+      - trivia_network
+    dns:
+      - 8.8.8.8  # Google's DNS
+      - 8.8.4.4  # Google's secondary DNS
+    command: python run.py
+    restart: unless-stopped
 
   db:
     image: postgres:14-alpine
@@ -35,6 +44,19 @@ services:
       - POSTGRES_DB=trivia_db
       - POSTGRES_USER=trivia_user
       - POSTGRES_PASSWORD=trivia_password
+    ports:
+      - "5432:5432"
+    networks:
+      - trivia_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trivia_user -d trivia_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  trivia_network:
+    driver: bridge
 
 volumes:
   postgres_data:
