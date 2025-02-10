@@ -8,7 +8,7 @@ services:
     volumes:
       - .:/app
     environment:
-      - FLASK_APP=app.py
+      - FLASK_APP=backend/app.py
       - FLASK_ENV=development
     env_file:
       - .env
@@ -17,14 +17,12 @@ services:
         condition: service_healthy
     networks:
       - trivia_network
-    command: >
-      sh -c "python app.py"
+    command: python backend/app.py
 
   question_generator:
     build: .
     volumes:
-      - ./question_generator.py:/app/question_generator.py
-      - ./prompts:/app/prompts
+      - .:/app
     env_file:
       - .env
     depends_on:
@@ -35,7 +33,7 @@ services:
     dns:
       - 8.8.8.8  # Google's DNS
       - 8.8.4.4  # Google's secondary DNS
-    command: python question_generator.py
+    command: python run.py
     restart: unless-stopped
 
   db:
@@ -46,6 +44,8 @@ services:
       - POSTGRES_DB=trivia_db
       - POSTGRES_USER=trivia_user
       - POSTGRES_PASSWORD=trivia_password
+    ports:
+      - "5432:5432"
     networks:
       - trivia_network
     healthcheck:

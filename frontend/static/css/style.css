@@ -1,0 +1,379 @@
+:root {
+    --primary-color: #58A6FF;
+    --secondary-color: #30363D;
+    --background-color: #0D1117;
+    --text-color: #C9D1D9;
+    --border-color: #21262D;
+    --correct-color: #3FB950;
+    --wrong-color: #F85149;
+    --hover-color: #1F2937;
+    --purple-accent: #8957E5;
+    --purple-hover: #7548C7;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--background-color);
+}
+
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Advertisement Spaces */
+.ad-space {
+    width: 100%;
+    height: 90px;
+    background-color: var(--secondary-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 10px 0;
+}
+
+.ad-placeholder {
+    color: var(--text-color);
+    font-style: italic;
+}
+
+/* Navigation */
+.navbar {
+    background-color: var(--secondary-color);
+    padding: 1rem;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-brand {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.nav-brand-link {
+    color: var(--purple-accent);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.nav-brand-link:hover {
+    color: var(--text-color);
+    background-color: var(--purple-accent);
+    transform: translateY(-1px);
+}
+
+.nav-brand-link:active {
+    transform: translateY(0);
+}
+
+.nav-links a, .nav-links button {
+    color: white;
+    text-decoration: none;
+    margin-left: 1rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid white;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+}
+
+/* Game Container */
+.game-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.screen {
+    margin: 20px 0;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Question Screen */
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--border-color);
+    margin-bottom: 30px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--purple-accent), var(--primary-color));
+    transition: width 0.3s ease;
+}
+
+#question-text {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    color: var(--text-color);
+    line-height: 1.4;
+}
+
+.choices-container {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.choice-button {
+    padding: 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    min-height: 60px;
+}
+
+.choice-button:hover:not(:disabled) {
+    background-color: var(--hover-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.choice-button.correct {
+    background-color: var(--correct-color);
+    border-color: var(--correct-color);
+    color: white;
+}
+
+.choice-button.wrong {
+    background-color: var(--wrong-color);
+    border-color: var(--wrong-color);
+    color: white;
+}
+
+.choice-button.fade-out {
+    opacity: 0.5;
+    transform: scale(0.95);
+    transition: all 0.3s ease;
+}
+
+/* Results Screen */
+#score-display {
+    background-color: var(--secondary-color);
+    padding: 2rem;
+    border-radius: 12px;
+    margin: 2rem 0;
+}
+
+#score-display h3 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    color: var(--purple-accent);
+}
+
+.primary-button {
+    background-color: var(--purple-accent);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.primary-button:hover {
+    background-color: var(--purple-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Calendar */
+.calendar-container {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    background: linear-gradient(145deg, var(--secondary-color), var(--hover-color));
+    color: var(--text-color);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-day.has-score {
+    background: linear-gradient(145deg, var(--purple-accent), var(--purple-hover));
+    animation: pulse 2s infinite;
+}
+
+/* Auth Forms */
+.auth-container {
+    max-width: 400px;
+    margin: 40px auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--secondary-color);
+    backdrop-filter: blur(10px);
+    background: linear-gradient(145deg, 
+        rgba(48, 54, 61, 0.8), 
+        rgba(31, 41, 55, 0.8)
+    );
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-group input {
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
+.form-group input:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+/* Message Box */
+.message {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 15px 25px;
+    border-radius: 8px;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    font-size: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.message.visible {
+    opacity: 1;
+}
+
+.message.error {
+    background-color: #ff4444;
+    color: white;
+}
+
+.message.info {
+    background-color: var(--purple-accent);
+    color: white;
+}
+
+/* Source Info */
+.source-info {
+    margin-top: 20px;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+/* Links */
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--purple-accent);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--purple-hover);
+}
+
+/* Loading Animation */
+.loader {
+    margin-top: 20px;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.loader.visible {
+    opacity: 1;
+}
+
+.loader-text {
+    color: var(--text-color);
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.loader-spinner {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--border-color);
+    border-radius: 50%;
+    border-top-color: var(--purple-accent);
+    animation: spin 1s ease-in-out infinite;
+}

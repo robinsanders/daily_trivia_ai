@@ -7,9 +7,12 @@ Flask-Migrate==4.0.5
 alembic==1.13.1
 
 # LangChain (updated versions)
-langchain-core>=0.1.7
-langchain-openai==0.0.2
-langchain-community==0.0.10
+langchain==0.1.4
+langchain-core>=0.1.16,<0.2
+langchain-openai==0.0.5
+langchain-community>=0.0.14
+pydantic>=2.5.3
+pydantic-core>=2.14.6
 
 # OpenAI
 httpcore==1.0.5
@@ -26,9 +29,17 @@ aiohttp==3.9.1
 youtube_transcript_api==0.6.1
 pytube==15.0.0
 
+# FastAPI Components
+fastapi==0.109.0
+tenacity==8.2.3
+
 # Utilities
 python-dotenv==1.0.0
 requests==2.31.0
 schedule==1.2.1
 bcrypt==4.1.2
 jinja2==3.1.2
+
+# Testing
+pytest==8.0.0
+pytest-asyncio==0.23.5
