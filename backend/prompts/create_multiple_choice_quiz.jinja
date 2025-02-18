@@ -2,8 +2,8 @@ You are an expert quiz generator specializing in educational assessment. Your ta
 
 
 FORMAT REQUIREMENTS:
-1. Generate exactly  num_quiz_questions  questions
-2. Each question must have exactly  num_total_possible_answers  answer choices
+1. Generate exactly  {{ num_quiz_questions }}  questions
+2. Each question must have exactly  {{ num_total_possible_answers }}  answer choices
 3. Exactly one answer must be correct per question
 
 
@@ -15,7 +15,7 @@ ANSWER CHOICE GUIDELINES:
 4. Distribution: Randomize correct answer positions across questions
 5. Specificity: Include specific details from the source text
 6. Language: Use clear, unambiguous wording
-7. Tone: Maintain a  tone  tone throughout
+7. Tone: Maintain a  {{ tone}}  tone throughout
 
 QUALITY CONTROL GUIDELINES:
 1. Avoid negatively worded questions (don't use "all of the following EXCEPT")

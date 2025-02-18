@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 from datetime import date
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -16,6 +17,8 @@ from .article_ingestion import ArticleIngestion
 from .article_processor import ArticleProcessor
 from .openai_question_schema import OpenAIQuestionSet
 from .jinja_helper import process_template
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import requests.exceptions
 
 # Load environment variables
 load_dotenv()
@@ -51,8 +54,23 @@ class QuestionGenerator:
             logger.error(f"Error initializing ChatOpenAI: {str(e)}")
             raise
 
+    def _make_api_request_with_retry(self, messages, max_retries=3):
+        """Make a request to OpenAI with retry logic"""
+        for attempt in range(max_retries):
+            try:
+                return self.model.invoke(messages)
+            except Exception as e:
+                if "connect" in str(e).lower() and attempt < max_retries - 1:
+                    logger.info(f"Connection failed, attempt {attempt + 1} of {max_retries}. Waiting 10 seconds...")
+                    time.sleep(10)
+                    continue
+                raise
+
     def generate_questions_for_chunk(self, chunk: str, num_questions: int = 4) -> None:
         """Generates questions for a given chunk using OpenAI API."""
+        synthesized_text = None
+        response = None
+        
         try:
             # First synthesize the text to extract key information
             query_template = process_template("synthesize_text.jinja", {"num_key_facts": "10"})
@@ -60,7 +78,12 @@ class QuestionGenerator:
             text = HumanMessagePromptTemplate.from_template(chunk)
             chat_prompt = ChatPromptTemplate.from_messages(messages=[query, text])    
             chat_prompt_formatted = chat_prompt.format_prompt()
-            synthesized_text = self.model.invoke(chat_prompt_formatted.to_messages()).content
+            
+            try:
+                synthesized_text = self._make_api_request_with_retry(chat_prompt_formatted.to_messages()).content
+            except Exception as e:
+                logger.error(f"Failed to synthesize text after retries: {str(e)}")
+                return  # Skip this chunk but continue with others
             
             # Generate quiz questions from synthesized text
             parser = PydanticOutputParser(pydantic_object=OpenAIQuestionSet)
@@ -77,18 +100,22 @@ class QuestionGenerator:
             text = HumanMessagePromptTemplate.from_template(synthesized_text)
             chat_prompt = ChatPromptTemplate.from_messages(messages=[query, text])
             chat_prompt_formatted = chat_prompt.format_prompt()
-            response = self.model.invoke(chat_prompt_formatted.to_messages())
-            questions_data = parser.parse(response.content)
             
-            # Update questions list with the parsed data
-            self.questions.extend(questions_data.model_dump()['questions'])
-            logger.info(f"Generated {len(questions_data.model_dump()['questions'])} questions from chunk")
+            try:
+                response = self._make_api_request_with_retry(chat_prompt_formatted.to_messages())
+                questions_data = parser.parse(response.content)
+                # Update questions list with the parsed data
+                self.questions.extend(questions_data.model_dump()['questions'])
+                logger.info(f"Generated {len(questions_data.model_dump()['questions'])} questions from chunk")
+            except Exception as e:
+                logger.error(f"Failed to generate questions after retries: {str(e)}")
+                return  # Skip this chunk but continue with others
             
         except Exception as e:
             logger.error(f"Error in generate_questions_for_chunk: {str(e)}")
-            logger.error(f"Synthesized text: {synthesized_text if 'synthesized_text' in locals() else 'No synthesized text'}")
-            logger.error(f"Response content: {response.content if 'response' in locals() else 'No response'}")
-            raise
+            logger.error(f"Synthesized text: {synthesized_text if synthesized_text else 'No synthesized text'}")
+            logger.error(f"Response content: {response.content if response else 'No response'}")
+            # Don't raise the exception - let the process continue with other chunks
 
     async def process_article(self) -> None:
         """Process article and generate questions."""

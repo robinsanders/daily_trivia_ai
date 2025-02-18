@@ -142,15 +142,32 @@ function showQuestion() {
     }
 }
 
+function createConfetti() {
+    const colors = ['#3FB950', '#1A7F37', '#238636', '#2EA043'];
+    for (let i = 0; i < 50; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + 'vw';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.animationDuration = (Math.random() * 1 + 1) + 's'; // Random duration between 1-2s
+        document.body.appendChild(confetti);
+        
+        // Remove confetti after animation
+        setTimeout(() => {
+            confetti.remove();
+        }, 2000);
+    }
+}
+
 function handleAnswer(choiceIndex) {
     console.log('Handling answer:', choiceIndex);
     const question = currentQuestions.questions[currentQuestionIndex];
     console.log('Current question:', question);
     const buttons = document.querySelectorAll('.choice-button');
+    const questionText = document.getElementById('question-text');
     
     buttons.forEach(button => {
         button.disabled = true;
-        button.classList.add('fade-out');  // Add fade-out effect to all buttons
     });
     
     // Find the correct answer index
@@ -160,28 +177,57 @@ function handleAnswer(choiceIndex) {
     // Add animation for correct/wrong answers
     if (choiceIndex === correctIndex) {
         console.log('Correct answer!');
+        questionText.classList.add('correct');
         buttons[choiceIndex].classList.add('correct');
-        buttons[choiceIndex].classList.remove('fade-out');  // Keep the correct answer visible
         score++;
         playSound('correct');
+        createConfetti();
+        showScoreIncrease();
+        
+        // Add success message
+        const explanation = document.createElement('div');
+        explanation.className = 'answer-explanation';
+        explanation.style.background = 'var(--success-color)';
+        explanation.innerHTML = `
+            <p class="explanation-text">
+                <strong>Excellent!</strong> That's the correct answer!
+            </p>
+        `;
+        questionText.parentNode.insertBefore(explanation, questionText.nextSibling);
+        
+        proceedToNextQuestion(1500); // Give more time to celebrate correct answers
     } else {
         console.log('Wrong answer!');
+        questionText.classList.add('incorrect');
         buttons[choiceIndex].classList.add('wrong');
         buttons[correctIndex].classList.add('correct');
-        buttons[choiceIndex].classList.remove('fade-out');  // Keep the selected answer visible
-        buttons[correctIndex].classList.remove('fade-out');  // Keep the correct answer visible
         playSound('wrong');
+        
+        // Add explanation text below the question
+        const explanation = document.createElement('div');
+        explanation.className = 'answer-explanation';
+        explanation.innerHTML = `
+            <p class="explanation-text">
+                <strong>Correct Answer:</strong> ${question.answers[correctIndex].text}
+            </p>
+        `;
+        questionText.parentNode.insertBefore(explanation, questionText.nextSibling);
+        
+        proceedToNextQuestion(2650);
     }
-    
+}
+
+function proceedToNextQuestion(delay) {
     // Show loading animation
     const loader = document.getElementById('next-question-loader');
     const loaderText = loader.querySelector('.loader-text');
     const isLastQuestion = currentQuestionIndex === currentQuestions.questions.length - 1;
     loaderText.textContent = isLastQuestion ? 'Preparing your quiz results...' : 'Loading next question...';
-    loader.classList.remove('hidden');
+    
     setTimeout(() => {
+        loader.classList.remove('hidden');
         loader.classList.add('visible');
-    }, 50);
+    }, delay - 200);
     
     setTimeout(() => {
         currentQuestionIndex++;
@@ -191,12 +237,20 @@ function handleAnswer(choiceIndex) {
             loader.classList.remove('visible');
             setTimeout(() => {
                 loader.classList.add('hidden');
+                // Remove any explanation from previous question
+                const explanation = document.querySelector('.answer-explanation');
+                if (explanation) {
+                    explanation.remove();
+                }
+                // Remove correct/incorrect classes from question
+                const questionText = document.getElementById('question-text');
+                questionText.classList.remove('incorrect', 'correct');
                 showQuestion();
             }, 300);
         } else {
             showResults();
         }
-    }, 250);
+    }, delay);
 }
 
 function playSound(type) {
@@ -229,7 +283,7 @@ function showResults() {
             return;
         }
         const percentage = (score / currentQuestions.questions.length) * 100;
-        scoreDisplay.textContent = `You scored ${score} out of ${currentQuestions.questions.length} (${Math.round(percentage)}%)`;
+        scoreDisplay.textContent = `You scored ${Math.round(percentage)}%`;
         
         // Display source information
         const sourceInfo = document.getElementById('source-info');
@@ -245,8 +299,8 @@ function showResults() {
             `;
         }
         
-        // Submit score to backend
-        submitScore(score);
+        // Submit score to backend (now sending percentage instead of raw score)
+        submitScore(Math.round(percentage));
         
         // Load and display calendar if user is logged in
         if (document.getElementById('calendar')) {
@@ -418,6 +472,70 @@ function displayCalendar(scores) {
     }
 }
 
+// Profile Functions
+async function loadUserProfile() {
+    try {
+        const response = await fetch('/get_user_scores');
+        if (!response.ok) {
+            throw new Error('Failed to fetch user scores');
+        }
+        
+        const scores = await response.json();
+        
+        // Calculate statistics
+        const percentages = scores.map(score => score.score);
+        const average = percentages.length > 0 
+            ? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length) 
+            : 0;
+        const best = percentages.length > 0 ? Math.max(...percentages) : 0;
+        
+        // Update statistics display
+        document.getElementById('average-score').textContent = `${average}%`;
+        document.getElementById('best-score').textContent = `${best}%`;
+        document.getElementById('total-quizzes').textContent = scores.length;
+        
+        // Create score chart
+        const ctx = document.getElementById('score-chart');
+        if (ctx) {
+            const chartData = scores.slice(-10).reverse(); // Get last 10 scores
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.map(score => new Date(score.date).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Score History',
+                        data: chartData.map(score => score.score),
+                        borderColor: '#4CAF50',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Score (%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        showMessage('Failed to load profile data', 'error');
+    }
+}
+
 // Helper function to format date as ISO string
 Date.prototype.toISOFormat = function() {
     return this.toISOString();
@@ -443,4 +561,72 @@ function showMessage(message, type = 'error') {
         messageBox.classList.remove('visible');
         setTimeout(() => messageBox.remove(), 300);
     }, 5000);
+}
+
+function createScoreParticles() {
+    const center = {
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2
+    };
+    
+    for (let i = 0; i < 20; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'score-increase-particles';
+        
+        // Random angle and distance
+        const angle = (Math.random() * 360) * (Math.PI / 180);
+        const distance = 100 + Math.random() * 100;
+        
+        // Calculate end position
+        const tx = Math.cos(angle) * distance;
+        const ty = Math.sin(angle) * distance;
+        
+        particle.style.left = `${center.x}px`;
+        particle.style.top = `${center.y}px`;
+        particle.style.setProperty('--tx', `${tx}px`);
+        particle.style.setProperty('--ty', `${ty}px`);
+        
+        document.body.appendChild(particle);
+        
+        setTimeout(() => particle.remove(), 1000);
+    }
+}
+
+function showScoreIncrease() {
+    const scoreIncrease = document.createElement('div');
+    scoreIncrease.className = 'score-increase';
+    
+    // Start the counter animation
+    let startValue = 0;
+    const endValue = 100;
+    const duration = 1220; // 1.22 seconds
+    const startTime = performance.now();
+    
+    function updateCounter(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for smooth slowdown
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const currentValue = Math.floor(startValue + (endValue - startValue) * easeOut);
+        
+        scoreIncrease.textContent = `+${currentValue}`;
+        
+        if (progress < 1) {
+            requestAnimationFrame(updateCounter);
+        }
+    }
+    
+    requestAnimationFrame(updateCounter);
+    document.body.appendChild(scoreIncrease);
+    
+    // Create particles
+    createScoreParticles();
+    
+    // Play a slot machine sound
+    const slotSound = new Audio('/static/sounds/slot-win.mp3');
+    slotSound.volume = 0.3;
+    slotSound.play();
+    
+    setTimeout(() => scoreIncrease.remove(), 1220);
 }

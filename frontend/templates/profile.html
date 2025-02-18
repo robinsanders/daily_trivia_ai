@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <h1>Your Profile</h1>
+        <h2>Welcome, {{ current_user.username }}!</h2>
+    </div>
+
+    <div class="stats-container">
+        <div class="stat-card">
+            <h3>Average Score</h3>
+            <div id="average-score">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <h3>Best Score</h3>
+            <div id="best-score">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <h3>Total Quizzes</h3>
+            <div id="total-quizzes">Loading...</div>
+        </div>
+    </div>
+
+    <div class="score-history">
+        <h3>Score History</h3>
+        <div id="score-chart"></div>
+    </div>
+
+    <div id="calendar" class="calendar-container">
+        <h3>Calendar View</h3>
+        <!-- Calendar will be populated by JavaScript -->
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUserProfile();
+        loadUserScores();  // This will populate the calendar
+    });
+</script>
+{% endblock %}

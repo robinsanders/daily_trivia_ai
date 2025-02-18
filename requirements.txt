@@ -31,7 +31,7 @@ pytube==15.0.0
 
 # FastAPI Components
 fastapi==0.109.0
-tenacity==8.2.3
+tenacity>=8.2.3
 
 # Utilities
 python-dotenv==1.0.0

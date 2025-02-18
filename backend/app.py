@@ -125,17 +125,30 @@ def get_questions():
     
     return jsonify({'error': 'No questions available'}), 404
 
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html')
+
 @app.route('/submit_score', methods=['POST'])
 @login_required
 def submit_score():
     data = request.get_json()
-    score_value = data.get('score')
+    score_value = data.get('score')  # Now expecting a percentage value (0-100)
     today = date.today()
     
     # Check if user already submitted a score today
     existing_score = Score.query.filter_by(user_id=current_user.id, date=today).first()
     if existing_score:
         return jsonify({'error': 'Already submitted score for today'}), 400
+    
+    # Validate score is a percentage
+    try:
+        score_value = int(score_value)
+        if not (0 <= score_value <= 100):
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid score value'}), 400
     
     new_score = Score(user_id=current_user.id, score=score_value, date=today)
     db.session.add(new_score)

@@ -18,11 +18,12 @@
         </div>
         <div class="nav-links">
             {% if current_user.is_authenticated %}
-                <span>Welcome, {{ current_user.username }}</span>
-                <button onclick="logout()">Logout</button>
+                <a href="{{ url_for('profile') }}" class="nav-link">Profile</a>
+                <span class="nav-username">{{ current_user.username }}</span>
+                <button onclick="logout()" class="nav-button">Logout</button>
             {% else %}
-                <a href="{{ url_for('login') }}">Login</a>
-                <a href="{{ url_for('signup') }}">Sign Up</a>
+                <a href="{{ url_for('login') }}" class="nav-link">Login</a>
+                <a href="{{ url_for('signup') }}" class="nav-link">Sign Up</a>
             {% endif %}
         </div>
     </nav>
