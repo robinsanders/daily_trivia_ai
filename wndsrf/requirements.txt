@@ -1,0 +1,13 @@
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+langchain==0.1.0
+openai==1.10.0
+wikipedia-api==0.6.0
+python-dotenv==1.0.0
+requests==2.31.0
+schedule==1.2.1
+bcrypt==4.1.2
+psycopg2-binary==2.9.9  # PostgreSQL adapter
+alembic==1.13.1  # Database migrations
+Flask-Migrate==4.0.5  # Flask migrations support
