@@ -18,127 +18,161 @@ document.addEventListener('DOMContentLoaded', () => {
     if (signupForm) {
         signupForm.addEventListener('submit', handleSignup);
     }
+
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', logout);
+    }
 });
 
 // Game Functions
 async function startGame() {
     try {
         console.log('Starting game...');
-        const response = await fetch('/get_questions');
-        console.log('Response:', response);
+        const response = await fetch('/get_questions', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin'
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Response headers:', [...response.headers.entries()]);
         
         if (response.status === 403) {
+            console.error('Authentication error');
             showMessage('Please log in to play the daily quiz!', 'info');
             return;
         }
         
+        if (response.status === 404) {
+            console.error('No questions found');
+            showMessage('No questions available for today. Please check back later!', 'info');
+            return;
+        }
+        
         if (!response.ok) {
-            throw new Error('Failed to fetch questions');
+            console.error('Response not OK:', response.status, response.statusText);
+            throw new Error(`Failed to fetch questions: ${response.status}`);
         }
 
-        currentQuestions = await response.json();
-        console.log('Questions loaded:', currentQuestions);
+        const data = await response.json();
+        console.log('Response data:', data);
         
-        if (!currentQuestions || !currentQuestions.questions || currentQuestions.questions.length === 0) {
+        // Validate the data structure
+        if (!data || typeof data !== 'object') {
+            console.error('Invalid response data structure:', data);
+            showMessage('An error occurred while loading the quiz. Please try again later.', 'error');
+            return;
+        }
+
+        // Check if we have valid questions array
+        if (!data.questions || !Array.isArray(data.questions)) {
+            console.error('No valid questions array found:', data.questions);
             showMessage('No questions available for today. Please check back later!', 'info');
             return;
         }
 
+        if (data.questions.length === 0) {
+            console.error('Questions array is empty');
+            showMessage('No questions available for today. Please check back later!', 'info');
+            return;
+        }
+
+        // Store questions and source information
+        currentQuestions = data;
+        console.log('Current questions set:', currentQuestions);
+        
         // Reset game state
         currentQuestionIndex = 0;
         score = 0;
         
         // Show first question
-        document.getElementById('welcome-screen').classList.add('hidden');
-        document.getElementById('question-screen').classList.remove('hidden');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const questionScreen = document.getElementById('question-screen');
+        if (!welcomeScreen || !questionScreen) {
+            console.error('Required screen elements not found:', { welcomeScreen, questionScreen });
+            return;
+        }
+        welcomeScreen.classList.add('hidden');
+        questionScreen.classList.remove('hidden');
         showQuestion();
         
     } catch (error) {
         console.error('Error starting game:', error);
-        showMessage('Log in or sign up to take the quiz!', 'error');
+        showMessage('An error occurred while loading the quiz. Please try again later.', 'error');
     }
 }
 
 function showQuestion() {
-    try {
-        console.log('Showing question:', currentQuestionIndex);
-        console.log('Current questions:', currentQuestions);
-        
-        if (!currentQuestions || !currentQuestions.questions) {
-            console.error('No questions data available');
-            alert('Failed to load questions. Please try again.');
-            return;
-        }
-        
-        const question = currentQuestions.questions[currentQuestionIndex];
-        if (!question) {
-            console.error('Question not found at index:', currentQuestionIndex);
-            alert('Error loading question. Please try again.');
-            return;
-        }
-        console.log('Current question:', question);
-        
-        const progressPercent = (currentQuestionIndex / currentQuestions.questions.length) * 100;
-        console.log('Progress:', progressPercent);
-        
-        // Animate progress bar
-        const progressFill = document.getElementById('progress-fill');
-        if (!progressFill) {
-            console.error('Progress fill element not found');
-            return;
-        }
-        console.log('Progress fill element:', progressFill);
-        progressFill.style.width = `${progressPercent}%`;
-        
-        // Add fade-in animation for question
-        const questionText = document.getElementById('question-text');
-        if (!questionText) {
-            console.error('Question text element not found');
-            return;
-        }
-        console.log('Question text element:', questionText);
-        questionText.style.opacity = '0';
-        questionText.textContent = question.text;
-        setTimeout(() => {
-            questionText.style.opacity = '1';
-        }, 50);
-        
-        const choicesContainer = document.getElementById('choices');
-        if (!choicesContainer) {
-            console.error('Choices container not found');
-            return;
-        }
-        console.log('Choices container:', choicesContainer);
-        choicesContainer.innerHTML = '';
-        
-        if (!Array.isArray(question.answers)) {
-            console.error('Question answers is not an array:', question.answers);
-            return;
-        }
-        
-        // Add staggered animation for choices
-        question.answers.forEach((choice, index) => {
-            if (!choice || typeof choice.text !== 'string') {
-                console.error('Invalid choice at index', index, ':', choice);
-                return;
-            }
-            console.log('Creating choice button:', choice);
-            const button = document.createElement('button');
-            button.className = 'choice-button';
-            button.textContent = choice.text;
-            button.style.opacity = '0';
-            button.style.transform = 'translateY(20px)';
-            button.addEventListener('click', () => handleAnswer(index));
-            choicesContainer.appendChild(button);
-            
-            setTimeout(() => {
-                button.style.opacity = '1';
-                button.style.transform = 'translateY(0)';
-            }, 100 * (index + 1));
-        });
-    } catch (error) {
-        console.error('Error in showQuestion:', error);
-        alert('An error occurred while displaying the question. Please try again.');
+    console.log('showQuestion called');
+    console.log('currentQuestions:', currentQuestions);
+    console.log('currentQuestionIndex:', currentQuestionIndex);
+    
+    if (!currentQuestions?.questions) {
+        console.error('No questions data available');
+        showMessage('An error occurred while loading the questions. Please try again later.', 'error');
+        return;
+    }
+    
+    if (!Array.isArray(currentQuestions.questions)) {
+        console.error('Questions is not an array:', currentQuestions.questions);
+        showMessage('An error occurred while loading the questions. Please try again later.', 'error');
+        return;
+    }
+    
+    if (currentQuestionIndex >= currentQuestions.questions.length) {
+        console.log('No more questions, showing results');
+        showResults();
+        return;
+    }
+    
+    const question = currentQuestions.questions[currentQuestionIndex];
+    console.log('Current question:', question);
+    
+    if (!question || !question.text || !Array.isArray(question.answers)) {
+        console.error('Invalid question structure:', question);
+        showMessage('An error occurred while displaying the question. Please try again later.', 'error');
+        return;
+    }
+
+    // Update question text
+    const questionText = document.getElementById('question-text');
+    if (!questionText) {
+        console.error('Question text element not found');
+        return;
+    }
+    questionText.textContent = question.text;
+
+    // Update choices
+    const choicesContainer = document.getElementById('choices');
+    if (!choicesContainer) {
+        console.error('Choices container element not found');
+        return;
+    }
+    
+    // Add source information if it's the first question
+    if (currentQuestionIndex === 0 && currentQuestions.source) {
+        const sourceInfo = document.createElement('div');
+        sourceInfo.className = 'source-info';
+        sourceInfo.innerHTML = `<small>Source: ${currentQuestions.source.title}</small>`;
+        questionText.parentNode.insertBefore(sourceInfo, questionText);
+    }
+    
+    // Create answer buttons
+    choicesContainer.innerHTML = question.answers.map((answer, index) => `
+        <button class="choice-button" onclick="handleAnswer(${index})">
+            ${answer.text}
+        </button>
+    `).join('');
+    
+    // Update progress bar
+    const progressFill = document.getElementById('progress-fill');
+    if (progressFill) {
+        const progress = ((currentQuestionIndex + 1) / currentQuestions.questions.length) * 100;
+        progressFill.style.width = `${progress}%`;
     }
 }
 
@@ -165,6 +199,12 @@ function handleAnswer(choiceIndex) {
     console.log('Current question:', question);
     const buttons = document.querySelectorAll('.choice-button');
     const questionText = document.getElementById('question-text');
+    const choicesContainer = document.getElementById('choices');
+    
+    // Prevent multiple clicks
+    if (buttons[0].disabled) {
+        return;
+    }
     
     buttons.forEach(button => {
         button.disabled = true;
@@ -174,46 +214,152 @@ function handleAnswer(choiceIndex) {
     const correctIndex = question.answers.findIndex(answer => answer.is_correct);
     console.log('Correct index:', correctIndex);
     
-    // Add animation for correct/wrong answers
-    if (choiceIndex === correctIndex) {
-        console.log('Correct answer!');
-        questionText.classList.add('correct');
-        buttons[choiceIndex].classList.add('correct');
+    // Calculate current score
+    const totalQuestions = currentQuestionIndex + 1;
+    const isCorrect = choiceIndex === correctIndex;
+    if (isCorrect) {
         score++;
-        playSound('correct');
-        createConfetti();
-        showScoreIncrease();
+    }
+    
+    // Update score displays immediately for feedback
+    const correctPoints = score * 99;
+    const incorrectPoints = (totalQuestions - score) * 25;
+    const lifeScore = correctPoints - incorrectPoints;
+    const isLastQuestion = totalQuestions === currentQuestions.questions.length;
+    const isPerfectScore = score === totalQuestions && isLastQuestion;
+    
+    // Only add perfect bonus on the last question if all answers were correct
+    const perfectBonus = isPerfectScore ? 1000 : 0;
+    
+    updateScoreDisplays({
+        correct_answers: score,
+        total_questions: totalQuestions,
+        life_score: lifeScore + perfectBonus
+    });
+    
+    // Add animation classes
+    choicesContainer.classList.add('reveal-mode');
+    
+    // Fade out unselected answers
+    buttons.forEach((button, index) => {
+        if (index !== choiceIndex && index !== correctIndex) {
+            button.classList.add('fade-out');
+        }
+    });
+
+    // Short delay before sliding answers
+    setTimeout(() => {
+        // Remove faded out buttons
+        buttons.forEach((button, index) => {
+            if (index !== choiceIndex && index !== correctIndex) {
+                button.style.display = 'none';
+            }
+        });
         
-        // Add success message
-        const explanation = document.createElement('div');
-        explanation.className = 'answer-explanation';
-        explanation.style.background = 'var(--success-color)';
-        explanation.innerHTML = `
-            <p class="explanation-text">
-                <strong>Excellent!</strong> That's the correct answer!
-            </p>
-        `;
-        questionText.parentNode.insertBefore(explanation, questionText.nextSibling);
+        // Add success/error classes and animations
+        if (isCorrect) {
+            buttons[choiceIndex].classList.add('correct');
+            playSound('correct');
+            createConfetti();
+            showScoreIncrease();
+            
+            // Show perfect score animation if this is the last question and all answers were correct
+            if (isPerfectScore) {
+                setTimeout(() => {
+                    showPerfectScore();
+                }, 1000); // Delay to let the regular score increase finish
+            }
+            
+            const explanation = document.createElement('div');
+            explanation.className = 'answer-explanation';
+            explanation.style.background = 'var(--success-color)';
+            explanation.innerHTML = `
+                <p class="explanation-text">
+                    <strong>Excellent!</strong> That's the correct answer!
+                </p>
+            `;
+            questionText.parentNode.insertBefore(explanation, questionText.nextSibling);
+            
+            proceedToNextQuestion(1230);
+        } else {
+            // Show both the wrong and correct answers
+            buttons[choiceIndex].classList.add('wrong');
+            buttons[correctIndex].classList.add('correct', 'highlight');
+            playSound('wrong');
+            showScoreDecrease();
+            
+            const explanation = document.createElement('div');
+            explanation.className = 'answer-explanation';
+            explanation.style.background = 'var(--error-color)';
+            explanation.innerHTML = `
+                <p class="explanation-text">
+                    <strong>The correct answer was:</strong> ${question.answers[correctIndex].text}
+                </p>
+            `;
+            questionText.parentNode.insertBefore(explanation, questionText.nextSibling);
+            
+            // Ensure we proceed to next question after showing the correct answer
+            proceedToNextQuestion(2173);
+        }
+    }, 150);
+}
+
+function updateScoreDisplays(scoreData) {
+    // Update current score percentage
+    const currentScoreDisplay = document.getElementById('current-score');
+    const lifeScoreDisplay = document.getElementById('life-score-value');
+    
+    if (currentScoreDisplay) {
+        const percentage = Math.round((scoreData.correct_answers / scoreData.total_questions) * 100);
+        currentScoreDisplay.textContent = `${percentage}%`;
+        currentScoreDisplay.classList.add('updating');
+        setTimeout(() => currentScoreDisplay.classList.remove('updating'), 410);
         
-        proceedToNextQuestion(1500); // Give more time to celebrate correct answers
-    } else {
-        console.log('Wrong answer!');
-        questionText.classList.add('incorrect');
-        buttons[choiceIndex].classList.add('wrong');
-        buttons[correctIndex].classList.add('correct');
-        playSound('wrong');
+        if (percentage > 50) {
+            // Create good score message
+            const goodMessage = document.createElement('div');
+            goodMessage.className = 'good-score-message';
+            goodMessage.innerHTML = `
+                <div class="good-score-content">
+                    <h2>Keep Going! 👍</h2>
+                    <p>+${scoreData.life_score} Life Points!</p>
+                </div>
+            `;
+            document.body.appendChild(goodMessage);
+            
+            // Remove message after animation
+            setTimeout(() => {
+                goodMessage.remove();
+            }, 960);
+        }
+    }
+    
+    if (lifeScoreDisplay) {
+        const oldValue = parseInt(lifeScoreDisplay.textContent) || 0;
+        const newValue = scoreData.life_score;
         
-        // Add explanation text below the question
-        const explanation = document.createElement('div');
-        explanation.className = 'answer-explanation';
-        explanation.innerHTML = `
-            <p class="explanation-text">
-                <strong>Correct Answer:</strong> ${question.answers[correctIndex].text}
-            </p>
-        `;
-        questionText.parentNode.insertBefore(explanation, questionText.nextSibling);
-        
-        proceedToNextQuestion(2650);
+        // Animate the life score change
+        if (oldValue !== newValue) {
+            lifeScoreDisplay.classList.add('updating');
+            
+            // Create a counting animation
+            const duration = 820;
+            const steps = 20;
+            const stepValue = (newValue - oldValue) / steps;
+            let currentStep = 0;
+            
+            const interval = setInterval(() => {
+                currentStep++;
+                const currentValue = Math.round(oldValue + (stepValue * currentStep));
+                lifeScoreDisplay.textContent = currentValue;
+                
+                if (currentStep >= steps) {
+                    clearInterval(interval);
+                    lifeScoreDisplay.textContent = newValue;
+                    lifeScoreDisplay.classList.remove('updating');
+                }
+            }, duration / steps);
+        }
     }
 }
 
@@ -254,15 +400,14 @@ function proceedToNextQuestion(delay) {
 }
 
 function playSound(type) {
-    // Optional: Add sound effects for correct/wrong answers
-    const audio = new Audio();
-    audio.volume = 0.5;
-    if (type === 'correct') {
-        audio.src = '/static/sounds/correct.mp3';
-    } else {
-        audio.src = '/static/sounds/wrong.mp3';
+    try {
+        const audio = new Audio(`/static/sounds/${type}.mp3`);
+        audio.play().catch(error => {
+            console.log(`Sound effect not available: ${type}.mp3`);
+        });
+    } catch (error) {
+        console.log('Sound playback not supported');
     }
-    audio.play().catch(() => {}); // Ignore errors if sound can't play
 }
 
 function showResults() {
@@ -285,6 +430,12 @@ function showResults() {
         const percentage = (score / currentQuestions.questions.length) * 100;
         scoreDisplay.textContent = `You scored ${Math.round(percentage)}%`;
         
+        // Show perfect score visual element if score is 100%
+        const perfectScoreElement = document.querySelector('.perfect-bonus');
+        if (perfectScoreElement && Math.round(percentage) === 100) {
+            perfectScoreElement.classList.remove('hidden');
+        }
+        
         // Display source information
         const sourceInfo = document.getElementById('source-info');
         if (sourceInfo && currentQuestions.source) {
@@ -300,7 +451,7 @@ function showResults() {
         }
         
         // Submit score to backend (now sending percentage instead of raw score)
-        submitScore(Math.round(percentage));
+        submitScore(Math.round(percentage), currentQuestions.questions.length);
         
         // Load and display calendar if user is logged in
         if (document.getElementById('calendar')) {
@@ -312,14 +463,17 @@ function showResults() {
     }
 }
 
-async function submitScore(finalScore) {
+async function submitScore(finalScore, totalQuestions) {
     try {
         const response = await fetch('/submit_score', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ score: finalScore })
+            body: JSON.stringify({
+                score: finalScore,
+                total_questions: totalQuestions
+            })
         });
         
         if (!response.ok) {
@@ -327,42 +481,86 @@ async function submitScore(finalScore) {
         }
         
         const data = await response.json();
-        console.log('Score submitted successfully:', data);
+        updateLifeScore(data);
+        return data;
     } catch (error) {
         console.error('Error submitting score:', error);
+        showError('Failed to submit score');
+    }
+}
+
+function createLifeScoreDisplay() {
+    const container = document.createElement('div');
+    container.className = 'life-score-container';
+    container.innerHTML = `
+        <div class="life-score-header">Life Score</div>
+        <div class="life-score-value">0</div>
+        <div class="life-score-detail">
+            <span class="life-adds">+0</span>
+            <span class="life-subs">-0</span>
+        </div>
+        <div class="perfect-bonus hidden">+1000 PERFECT!</div>
+    `;
+    document.body.appendChild(container);
+    return container;
+}
+
+function updateLifeScore(scoreData) {
+    const container = document.querySelector('.life-score-container') || createLifeScoreDisplay();
+    const valueDisplay = container.querySelector('.life-score-value');
+    const addsDisplay = container.querySelector('.life-adds');
+    const subsDisplay = container.querySelector('.life-subs');
+    const bonusDisplay = container.querySelector('.perfect-bonus');
+    
+    // Create slot machine effect for life score
+    const oldValue = parseInt(valueDisplay.textContent) || 0;
+    const newValue = scoreData.life_score;
+    
+    // Clear previous content
+    valueDisplay.innerHTML = '';
+    
+    // Create spinning digits
+    String(newValue).padStart(5, '0').split('').forEach((digit, index) => {
+        const digitContainer = document.createElement('div');
+        digitContainer.className = 'slot-digit';
+        
+        const digitInner = document.createElement('div');
+        digitInner.className = 'slot-digit-inner slot-spin';
+        digitInner.style.animationDelay = `${index * 0.1}s`;
+        
+        // Generate random numbers for spinning effect
+        for (let i = 0; i < 10; i++) {
+            const span = document.createElement('span');
+            span.textContent = Math.floor(Math.random() * 10);
+            digitInner.appendChild(span);
+        }
+        
+        // Add final digit
+        const finalDigit = document.createElement('span');
+        finalDigit.textContent = digit;
+        digitInner.appendChild(finalDigit);
+        
+        digitContainer.appendChild(digitInner);
+        valueDisplay.appendChild(digitContainer);
+    });
+    
+    // Animate adds and subs
+    addsDisplay.textContent = `+${scoreData.life_adds}`;
+    subsDisplay.textContent = `-${scoreData.life_subs}`;
+    
+    // Show perfect bonus if applicable
+    if (scoreData.perfect_bonus) {
+        bonusDisplay.classList.remove('hidden');
+        // Play special bonus sound
+        const bonusSound = new Audio('/static/sounds/jackpot.mp3');
+        bonusSound.volume = 0.4;
+        bonusSound.play();
+    } else {
+        bonusDisplay.classList.add('hidden');
     }
 }
 
 // Authentication Functions
-async function handleLogin(event) {
-    event.preventDefault();
-    
-    const formData = {
-        username: document.getElementById('username').value,
-        password: document.getElementById('password').value
-    };
-    
-    try {
-        const response = await fetch('/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData)
-        });
-        
-        if (response.ok) {
-            window.location.href = '/';
-        } else {
-            const data = await response.json();
-            alert(data.error || 'Login failed');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('An error occurred. Please try again.');
-    }
-}
-
 async function handleSignup(event) {
     event.preventDefault();
     
@@ -400,15 +598,56 @@ async function handleSignup(event) {
     }
 }
 
-async function logout() {
+async function handleLogin(event) {
+    event.preventDefault();
+    
+    const formData = {
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value
+    };
+    
     try {
-        const response = await fetch('/logout');
+        const response = await fetch('/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+        
         if (response.ok) {
-            window.location.reload();
+            window.location.href = '/';
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Login failed');
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('An error occurred during logout');
+        alert('An error occurred. Please try again.');
+    }
+}
+
+async function logout() {
+    try {
+        const response = await fetch('/logout', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin'
+        });
+
+        if (response.ok) {
+            // Redirect to home page after successful logout
+            window.location.href = '/';
+        } else {
+            console.error('Logout failed:', response.status);
+            showMessage('Failed to logout. Please try again.', 'error');
+        }
+    } catch (error) {
+        console.error('Error during logout:', error);
+        showMessage('An error occurred during logout. Please try again.', 'error');
     }
 }
 
@@ -426,49 +665,80 @@ async function loadUserScores() {
     }
 }
 
+function formatDateToYYYYMMDD(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function displayCalendar(scores) {
     const calendar = document.getElementById('calendar');
     if (!calendar) return;
     
     calendar.innerHTML = '';
     
-    // Create a map of dates to scores
-    const scoreMap = new Map(scores.map(score => [score.date, score.score]));
-    
-    // Get the current date and start of month
-    const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-    
-    // Add day labels
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    days.forEach(day => {
-        const dayLabel = document.createElement('div');
-        dayLabel.className = 'calendar-day day-label';
-        dayLabel.textContent = day;
-        calendar.appendChild(dayLabel);
-    });
-    
-    // Add empty cells for days before start of month
-    for (let i = 0; i < startOfMonth.getDay(); i++) {
-        const emptyDay = document.createElement('div');
-        emptyDay.className = 'calendar-day empty';
-        calendar.appendChild(emptyDay);
-    }
-    
-    // Add days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = new Date(today.getFullYear(), today.getMonth(), day).toISOFormat().split('T')[0];
-        const dayElement = document.createElement('div');
-        dayElement.className = 'calendar-day';
-        dayElement.textContent = day;
-        
-        if (scoreMap.has(dateStr)) {
-            dayElement.classList.add('has-score');
-            dayElement.title = `Score: ${scoreMap.get(dateStr)}`;
+    try {
+        // Validate scores data
+        if (!Array.isArray(scores)) {
+            console.error('Invalid scores data:', scores);
+            showMessage('Error loading calendar data', 'error');
+            return;
         }
         
-        calendar.appendChild(dayElement);
+        // Create a map of dates to scores, with validation
+        const scoreMap = new Map();
+        scores.forEach(score => {
+            if (score && typeof score.date === 'string' && !isNaN(score.score)) {
+                scoreMap.set(score.date, score.score);
+            }
+        });
+        
+        // Get the current date and start of month
+        const today = new Date();
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+        
+        // Add day labels
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        days.forEach(day => {
+            const dayLabel = document.createElement('div');
+            dayLabel.className = 'calendar-day day-label';
+            dayLabel.textContent = day;
+            calendar.appendChild(dayLabel);
+        });
+        
+        // Add empty cells for days before start of month
+        for (let i = 0; i < startOfMonth.getDay(); i++) {
+            const emptyDay = document.createElement('div');
+            emptyDay.className = 'calendar-day empty';
+            calendar.appendChild(emptyDay);
+        }
+        
+        // Add days of the month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(today.getFullYear(), today.getMonth(), day);
+            const dateStr = formatDateToYYYYMMDD(date);
+            const dayElement = document.createElement('div');
+            dayElement.className = 'calendar-day';
+            dayElement.textContent = day;
+            
+            if (scoreMap.has(dateStr)) {
+                const score = scoreMap.get(dateStr);
+                dayElement.classList.add('has-score');
+                dayElement.title = `Score: ${score}%`;
+                
+                // Add color coding based on score
+                if (score >= 80) dayElement.classList.add('high-score');
+                else if (score >= 50) dayElement.classList.add('medium-score');
+                else dayElement.classList.add('low-score');
+            }
+            
+            calendar.appendChild(dayElement);
+        }
+    } catch (error) {
+        console.error('Error displaying calendar:', error);
+        showMessage('Error displaying calendar', 'error');
     }
 }
 
@@ -535,11 +805,6 @@ async function loadUserProfile() {
         showMessage('Failed to load profile data', 'error');
     }
 }
-
-// Helper function to format date as ISO string
-Date.prototype.toISOFormat = function() {
-    return this.toISOString();
-};
 
 function showMessage(message, type = 'error') {
     const messageBox = document.createElement('div');
@@ -629,4 +894,68 @@ function showScoreIncrease() {
     slotSound.play();
     
     setTimeout(() => scoreIncrease.remove(), 1220);
+}
+
+function showScoreDecrease() {
+    const scoreDecrease = document.createElement('div');
+    scoreDecrease.className = 'score-decrease';
+    
+    // Start the counter animation
+    let startValue = 0;
+    const endValue = 25;
+    const duration = 1000; // 1 second
+    const startTime = performance.now();
+    
+    function updateCounter(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for smooth slowdown
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const currentValue = Math.floor(startValue + (endValue - startValue) * easeOut);
+        
+        scoreDecrease.textContent = `-${currentValue}`;
+        
+        if (progress < 1) {
+            requestAnimationFrame(updateCounter);
+        }
+    }
+    
+    requestAnimationFrame(updateCounter);
+    document.body.appendChild(scoreDecrease);
+    
+    // Remove the element after animation
+    setTimeout(() => {
+        document.body.removeChild(scoreDecrease);
+    }, 1100);
+}
+
+function showPerfectScore() {
+    const perfectScore = document.createElement('div');
+    perfectScore.className = 'score-increase';
+    perfectScore.style.fontSize = '3rem';
+    perfectScore.style.background = 'rgba(148, 0, 211, 0.85)';  // Deep purple
+    perfectScore.innerHTML = `
+        <div style="text-align: center">
+            <div style="font-size: 2.5rem">🏆 PERFECT! 🏆</div>
+            <div style="color: #FFD700">+1000</div>
+        </div>
+    `;
+    
+    document.body.appendChild(perfectScore);
+    
+    // Create extra celebratory confetti
+    for (let i = 0; i < 3; i++) {
+        setTimeout(() => createConfetti(), i * 300);
+    }
+    
+    // Play celebratory sound
+    const perfectSound = new Audio('/static/sounds/slot-win.mp3');
+    perfectSound.volume = 0.4;
+    perfectSound.play();
+    
+    // Remove the element after animation
+    setTimeout(() => {
+        document.body.removeChild(perfectScore);
+    }, 2000);
 }

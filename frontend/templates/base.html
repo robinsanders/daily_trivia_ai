@@ -13,8 +13,20 @@
     </div>
 
     <nav class="navbar">
-        <div class="nav-brand">
-            <a href="{{ url_for('index') }}" class="nav-brand-link">Daily Trivia AI</a>
+        <div class="navbar-brand">
+            <a href="/" class="navbar-logo">Knowledge Bet </a>
+        </div>
+        <div class="score-tracking">
+            <div class="score-display">
+                <div class="current-score">
+                    <span class="score-label">Current Score:</span>
+                    <span class="score-value" id="current-score">0%</span>
+                </div>
+                <div class="life-score-mini">
+                    <span class="score-label">Life Score:</span>
+                    <span class="score-value" id="life-score-value">0</span>
+                </div>
+            </div>
         </div>
         <div class="nav-links">
             {% if current_user.is_authenticated %}
@@ -37,6 +49,13 @@
         <div class="ad-placeholder">Advertisement</div>
     </div>
 
+    <script>
+        // Check user authentication status
+        const currentUser = {
+            is_authenticated: {{ 'true' if current_user.is_authenticated else 'false' }},
+            username: {% if current_user.is_authenticated %}{{ current_user.username|tojson|safe }}{% else %}null{% endif %}
+        };
+    </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

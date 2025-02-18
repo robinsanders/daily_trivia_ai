@@ -1,7 +1,6 @@
 import schedule
 import time
 import logging
-import asyncio
 from .question_generator import generate_daily_questions
 
 # Configure logging
@@ -11,10 +10,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def run_daily_questions():
+def run_daily_questions():
     """Run the daily question generation process."""
     try:
-        await generate_daily_questions()
+        generate_daily_questions()
     except Exception as e:
         logger.error(f"Error in daily question generation: {str(e)}")
 
@@ -23,10 +22,10 @@ def run_scheduler():
     logger.info("Starting question generator scheduler")
     
     # Run immediately
-    asyncio.run(run_daily_questions())
+    run_daily_questions()
     
     # Schedule for daily runs
-    schedule.every().day.at("00:00").do(lambda: asyncio.run(run_daily_questions()))
+    schedule.every().day.at("00:00").do(run_daily_questions)
     
     while True:
         try:

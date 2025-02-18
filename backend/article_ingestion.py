@@ -47,11 +47,25 @@ class ArticleIngestion:
         
         return None
 
-    async def get_random_article(self) -> None:
+    def get_random_article(self) -> None:
         """Fetch and store text content from a random Wikipedia article."""
         logger.info("Fetching random Wikipedia article")
         
-        categories = ['Pirates', 'Association_football', 'Basketball', 'Artificial_intelligence', 'Personal_finance']
+        
+        categories = [
+            'Chinese_pirates',
+            'Super_Bowl_champions',
+            'Japanese_manga',
+            'NASCAR_drivers',
+            'Formula_One_drivers',
+            'Porsche_vehicles',
+            'American_inventions',
+            'Space_exploration',
+            'Olympic_Games',
+            'Ancient_civilizations'
+            ]
+        
+        
         max_retries = 10
         attempts = 0
         
@@ -76,7 +90,7 @@ class ArticleIngestion:
                     logger.info(f"Selected article: {page.title}")
                     self.article_text = page.text
                     self.article_title = page.title
-                    return
+                    return True
                 
                 logger.info(f"Skipping incompatible article: {page.title if page else 'None'}")
             except Exception as e:

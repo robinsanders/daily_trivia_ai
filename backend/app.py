@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 import json
 import bcrypt
+import logging
 
 load_dotenv()
 
@@ -17,6 +18,10 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 60 * 60 * 24 * 30  # 30 days
 app.config['SESSION_COOKIE_SECURE'] = False  # Allow non-HTTPS in development
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['REMEMBER_COOKIE_DURATION'] = 60 * 60 * 24 * 30  # 30 days
+app.config['REMEMBER_COOKIE_SECURE'] = False
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
     'DATABASE_URL',
     'postgresql://trivia_user:trivia_password@db:5432/trivia_db'
@@ -25,6 +30,7 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+logger = logging.getLogger(__name__)
 
 # Database Models
 class User(UserMixin, db.Model):
@@ -38,6 +44,10 @@ class Score(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False)
+    total_questions = db.Column(db.Integer, nullable=False)
+    correct_answers = db.Column(db.Integer, nullable=False)
+    incorrect_answers = db.Column(db.Integer, nullable=False)
+    life_score = db.Column(db.Integer, nullable=False)
 
 class DailyQuestions(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -47,6 +57,11 @@ class DailyQuestions(db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+
+@app.before_request
+def before_request():
+    if current_user.is_authenticated:
+        session.permanent = True  # Make the session permanent
 
 # Routes
 @app.route('/')
@@ -77,11 +92,10 @@ def signup():
 def login():
     if request.method == 'POST':
         data = request.get_json()
-        user = User.query.filter_by(username=data.get('username')).first()
+        user = User.query.filter_by(username=data['username']).first()
         
-        if user and bcrypt.checkpw(data.get('password').encode('utf-8'), user.password):
-            login_user(user, remember=True)
-            session.permanent = True
+        if user and bcrypt.checkpw(data['password'].encode('utf-8'), user.password):
+            login_user(user, remember=True)  # Enable remember me
             return jsonify({'message': 'Logged in successfully'})
         
         return jsonify({'error': 'Invalid username or password'}), 401
@@ -97,33 +111,37 @@ def logout():
 @app.route('/get_questions')
 @login_required
 def get_questions():
-    print("User authenticated:", current_user.is_authenticated)
-    print("Current user:", current_user.get_id() if current_user.is_authenticated else None)
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Authentication required'}), 403
+        
     today = date.today()
     daily_questions = DailyQuestions.query.filter_by(date=today).first()
     
     if daily_questions:
         try:
             questions_data = json.loads(daily_questions.questions)
-            if not questions_data:
-                return jsonify({'error': 'Invalid question data'}), 500
+            if not questions_data or not questions_data.get('questions'):
+                raise ValueError('Invalid question data format')
             return jsonify(questions_data)
-        except json.JSONDecodeError:
-            return jsonify({'error': 'Invalid question format'}), 500
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"Error loading questions: {e}")
+            db.session.delete(daily_questions)
+            db.session.commit()
+            # Continue to generate new questions
     
-    # If no questions available, try to generate them
+    # If no questions available or invalid, generate them
     try:
         from question_generator import generate_daily_questions
-        generate_daily_questions()
+        questions_data = generate_daily_questions()
         
-        # Try fetching again
-        daily_questions = DailyQuestions.query.filter_by(date=today).first()
-        if daily_questions:
-            return jsonify(json.loads(daily_questions.questions))
+        if not questions_data:
+            logger.error("Question generation failed: No questions returned")
+            return jsonify({'error': 'No questions available for today. Please try again later.'}), 404
+            
+        return jsonify(questions_data)
     except Exception as e:
-        print(f"Error generating questions: {e}")
-    
-    return jsonify({'error': 'No questions available'}), 404
+        logger.error(f"Error generating questions: {e}", exc_info=True)
+        return jsonify({'error': 'An error occurred while generating questions. Please try again later.'}), 500
 
 @app.route('/profile')
 @login_required
@@ -134,33 +152,51 @@ def profile():
 @login_required
 def submit_score():
     data = request.get_json()
-    score_value = data.get('score')  # Now expecting a percentage value (0-100)
-    today = date.today()
     
-    # Check if user already submitted a score today
-    existing_score = Score.query.filter_by(user_id=current_user.id, date=today).first()
-    if existing_score:
-        return jsonify({'error': 'Already submitted score for today'}), 400
+    if not all(key in data for key in ['score', 'total_questions', 'correct_answers', 'incorrect_answers']):
+        return jsonify({'error': 'Missing required fields'}), 400
     
-    # Validate score is a percentage
     try:
-        score_value = int(score_value)
-        if not (0 <= score_value <= 100):
-            raise ValueError
-    except (TypeError, ValueError):
-        return jsonify({'error': 'Invalid score value'}), 400
-    
-    new_score = Score(user_id=current_user.id, score=score_value, date=today)
-    db.session.add(new_score)
-    db.session.commit()
-    
-    return jsonify({'message': 'Score submitted successfully'})
+        today = date.today()
+        existing_score = Score.query.filter_by(user_id=current_user.id, date=today).first()
+        
+        if existing_score:
+            return jsonify({'error': 'Score already submitted for today'}), 400
+        
+        # Calculate life score
+        all_scores = Score.query.filter_by(user_id=current_user.id).all()
+        total_life_score = sum(score.score for score in all_scores)
+        new_life_score = total_life_score + data['score']
+        
+        new_score = Score(
+            user_id=current_user.id,
+            score=data['score'],
+            date=today,
+            total_questions=data['total_questions'],
+            correct_answers=data['correct_answers'],
+            incorrect_answers=data['incorrect_answers'],
+            life_score=new_life_score
+        )
+        
+        db.session.add(new_score)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Score submitted successfully',
+            'score': data['score'],
+            'life_score': new_life_score
+        })
+        
+    except Exception as e:
+        logger.error(f"Error submitting score: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'An error occurred while submitting your score'}), 500
 
 @app.route('/get_user_scores')
 @login_required
 def get_user_scores():
     scores = Score.query.filter_by(user_id=current_user.id).all()
-    score_data = [{'date': score.date.isoformat(), 'score': score.score} for score in scores]
+    score_data = [{'date': score.date.isoformat(), 'score': score.score, 'life_score': score.life_score} for score in scores]
     return jsonify(score_data)
 
 if __name__ == '__main__':

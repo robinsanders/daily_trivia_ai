@@ -1,11 +1,23 @@
+
 {% extends "base.html" %}
 
 {% block content %}
 <div class="game-container">
     <div id="welcome-screen" class="screen">
-        <h1>Welcome to Daily Trivia AI!</h1>
+        <h1>Welcome to Knowledge Bet!</h1>
         <p>Test your knowledge with AI-generated questions from Wikipedia</p>
-        <button id="start-game" class="primary-button">Start Today's Quiz</button>
+        {% if current_user.is_authenticated %}
+            <button id="start-game" class="primary-button">Start Today's Quiz</button>
+        {% else %}
+            <div class="auth-prompt">
+                <p>Log in or sign up to start the quiz!</p>
+                <div class="auth-buttons">
+                    <a href="{{ url_for('login') }}" class="button primary-button">Login</a>
+                    <a href="{{ url_for('signup') }}" class="button secondary-button">Sign Up</a>
+                </div>
+                <p class="auth-note">Create an account to track your progress and compete on the leaderboard!</p>
+            </div>
+        {% endif %}
     </div>
 
     <div id="question-screen" class="screen hidden">

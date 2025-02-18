@@ -13,12 +13,11 @@ from langchain_core.prompts.chat import (
 from langchain.output_parsers import PydanticOutputParser
 from jinja2 import Environment, FileSystemLoader
 from .app import app, db, DailyQuestions
-from .article_ingestion import ArticleIngestion
 from .article_processor import ArticleProcessor
 from .openai_question_schema import OpenAIQuestionSet
 from .jinja_helper import process_template
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-import requests.exceptions
+from .article_ingestion import ArticleIngestion
+import wikipediaapi
 
 # Load environment variables
 load_dotenv()
@@ -58,12 +57,18 @@ class QuestionGenerator:
         """Make a request to OpenAI with retry logic"""
         for attempt in range(max_retries):
             try:
-                return self.model.invoke(messages)
+                logger.info(f"Making OpenAI API request (attempt {attempt + 1}/{max_retries})")
+                response = self.model.invoke(messages)
+                logger.info("OpenAI API request successful")
+                return response
             except Exception as e:
+                logger.error(f"Error in OpenAI API request (attempt {attempt + 1}): {str(e)}")
                 if "connect" in str(e).lower() and attempt < max_retries - 1:
                     logger.info(f"Connection failed, attempt {attempt + 1} of {max_retries}. Waiting 10 seconds...")
                     time.sleep(10)
                     continue
+                if attempt == max_retries - 1:
+                    logger.error("All retry attempts failed")
                 raise
 
     def generate_questions_for_chunk(self, chunk: str, num_questions: int = 4) -> None:
@@ -87,6 +92,7 @@ class QuestionGenerator:
             
             # Generate quiz questions from synthesized text
             parser = PydanticOutputParser(pydantic_object=OpenAIQuestionSet)
+
             query_template = process_template(
                 "create_multiple_choice_quiz.jinja",
                 {
@@ -104,6 +110,8 @@ class QuestionGenerator:
             try:
                 response = self._make_api_request_with_retry(chat_prompt_formatted.to_messages())
                 questions_data = parser.parse(response.content)
+                logger.info(f"Generated {questions_data} from chunk")
+
                 # Update questions list with the parsed data
                 self.questions.extend(questions_data.model_dump()['questions'])
                 logger.info(f"Generated {len(questions_data.model_dump()['questions'])} questions from chunk")
@@ -117,7 +125,7 @@ class QuestionGenerator:
             logger.error(f"Response content: {response.content if response else 'No response'}")
             # Don't raise the exception - let the process continue with other chunks
 
-    async def process_article(self) -> None:
+    def process_article(self) -> None:
         """Process article and generate questions."""
         try:
             # Process the text into chunks
@@ -134,27 +142,47 @@ class QuestionGenerator:
             logger.error(f"Error processing article: {str(e)}", exc_info=True)
             raise
 
-async def generate_daily_questions():
-    with app.app_context():
-        today = date.today()
-        logger.info(f"Starting daily question generation for {today}")
-        
-        # Check if questions already exist for today
-        existing = DailyQuestions.query.filter_by(date=today).first()
-        if existing:
-            logger.info("Questions already exist for today")
-            return
-        
-        try:
+def generate_daily_questions():
+    """Generate daily questions and store them in the database."""
+    try:
+        with app.app_context():
+            today = date.today()
+            logger.info(f"Starting daily question generation for {today}")
+            
+            # Check if questions already exist for today
+            existing = DailyQuestions.query.filter_by(date=today).first()
+            if existing:
+                logger.info("Questions already exist for today")
+                try:
+                    questions = json.loads(existing.questions)
+                    logger.info(f"Loaded existing questions: {questions}")
+                    return questions
+                except json.JSONDecodeError:
+                    logger.error("Existing questions are invalid JSON, regenerating...")
+                    db.session.delete(existing)
+                    db.session.commit()
+            
             question_gen = QuestionGenerator()
             
             # Get random article
             logger.info("Fetching random Wikipedia article...")
-            await question_gen.article_ingestion.get_random_article()
+            success = question_gen.article_ingestion.get_random_article()
+            if not success:
+                logger.error("Failed to fetch random article")
+                raise ValueError("Failed to fetch random article")
+            
+            logger.info(f"Article title: {question_gen.article_ingestion.article_title}")
+            logger.info(f"Article text length: {len(question_gen.article_ingestion.article_text)}")
             
             # Process article and generate questions
             logger.info("Processing article content...")
-            await question_gen.process_article()
+            question_gen.process_article()
+            
+            if not question_gen.questions:
+                logger.error("No questions were generated")
+                raise ValueError("No questions were generated")
+            
+            logger.info(f"Generated {len(question_gen.questions)} questions")
             
             # Prepare data for storage
             questions_data = {
@@ -165,6 +193,8 @@ async def generate_daily_questions():
                 }
             }
             
+            logger.info(f"Questions data: {json.dumps(questions_data, indent=2)}")
+            
             # Store in database
             daily_questions = DailyQuestions(
                 date=today,
@@ -172,11 +202,10 @@ async def generate_daily_questions():
             )
             db.session.add(daily_questions)
             db.session.commit()
-            logger.info(f"Successfully stored questions for {today}")
             
-            # Log a summary
-            logger.info(f"Generated {len(question_gen.questions)} questions from article: {question_gen.article_ingestion.article_title}")
+            logger.info("Successfully generated and stored daily questions")
+            return questions_data
             
-        except Exception as e:
-            logger.error(f"Error generating daily questions: {str(e)}", exc_info=True)
-            raise
+    except Exception as e:
+        logger.error(f"Error generating daily questions: {str(e)}", exc_info=True)
+        raise
