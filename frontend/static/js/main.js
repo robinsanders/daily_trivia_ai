@@ -472,7 +472,9 @@ async function submitScore(finalScore, totalQuestions) {
             },
             body: JSON.stringify({
                 score: finalScore,
-                total_questions: totalQuestions
+                total_questions: totalQuestions,
+                correct_answers: score,  
+                incorrect_answers: totalQuestions - score  
             })
         });
         
